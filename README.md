@@ -1,2 +1,2 @@
-# tolerant-thermostat
-HASS Custom component for thermostat with dual setpoints
+# Tolerant Thermostat
+HASS thermostat with dual temperature setpoints and no tolerances at all!
