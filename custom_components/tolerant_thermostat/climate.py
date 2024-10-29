@@ -32,8 +32,6 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         target_temp_low: float | None,
         inverted: bool | None,
         min_cycle_duration: timedelta | None,
-        cold_tolerance: float,
-        hot_tolerance: float,
         presets: dict[str, float],
         precision: float | None,
         target_temperature_step: float | None,
@@ -42,33 +40,34 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
     ) -> None:
         """Initialize the thermostat."""
         self._attr_name = name
+        self._attr_unique_id = unique_id
         self.target_entity_id = target_entity_id
         self.sensor_entity_id = sensor_entity_id
         self._inverted = inverted
         self.min_cycle_duration = min_cycle_duration
-        self._cold_tolerance = cold_tolerance
-        self._hot_tolerance = hot_tolerance
         self._hvac_mode = HVACMode.OFF
         self._temp_precision = precision
         self._temp_target_temperature_step = target_temperature_step
-        if self._inverted:
-            self._attr_hvac_modes = [HVACMode.COOL, HVACMode.OFF]
-        else:
-            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
         self._cur_temp: float | None = None
         self._temp_lock = asyncio.Lock()
         self._min_temp = min_temp
         self._max_temp = max_temp
         self._target_temp_high = target_temp_high
         self._target_temp_low = target_temp_low
-        self._attr_preset_mode = PRESET_NONE
         self._attr_temperature_unit = unit
-        self._attr_unique_id = unique_id
+
+        if self._inverted:
+            self._attr_hvac_modes = [HVACMode.COOL, HVACMode.OFF]
+        else:
+            self._attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
+
         self._attr_supported_features = (
             ClimateEntityFeature.TARGET_TEMPERATURE_RANGE
             | ClimateEntityFeature.TURN_OFF
             | ClimateEntityFeature.TURN_ON
         )
+
+        self._attr_preset_mode = PRESET_NONE
         if len(presets):
             self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
             self._attr_preset_modes = [PRESET_NONE, *presets.keys()]
