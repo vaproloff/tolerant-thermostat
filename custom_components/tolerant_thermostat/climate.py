@@ -3,6 +3,7 @@
 import asyncio
 from datetime import datetime, timedelta
 import logging
+import math
 from typing import Any
 
 from homeassistant.components.climate import (
@@ -14,8 +15,14 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.const import (
+    STATE_OFF,
+    STATE_ON,
+    STATE_UNAVAILABLE,
+    STATE_UNKNOWN,
+    UnitOfTemperature,
+)
+from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
 from homeassistant.helpers.restore_state import RestoreEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -192,6 +199,18 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
 
         await self._async_control(force=True)
         self.async_write_ha_state()
+
+    def _async_update_temp(self, state: State) -> None:
+        """Update thermostat with latest state from sensor."""
+        try:
+            cur_temp = float(state.state)
+            if not math.isfinite(cur_temp):
+                raise ValueError(  # noqa: TRY301
+                    f"{self.entity_id}: sensor has illegal state: {state.state}"
+                )
+            self._cur_temp = cur_temp
+        except ValueError as ex:
+            _LOGGER.error("%s: unable to update from sensor: %s", self.entity_id, ex)
 
     async def _async_control(
         self, time: datetime | None = None, force: bool = False
