@@ -1,7 +1,7 @@
 """Adds support for Tolerant Thermostat units."""
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import timedelta
 import logging
 import math
 from typing import Any
@@ -16,13 +16,24 @@ from homeassistant.components.climate import (
     HVACMode,
 )
 from homeassistant.const import (
+    ATTR_ENTITY_ID,
+    SERVICE_TURN_OFF,
+    SERVICE_TURN_ON,
     STATE_OFF,
     STATE_ON,
     STATE_UNAVAILABLE,
     STATE_UNKNOWN,
     UnitOfTemperature,
 )
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant, State
+from homeassistant.core import (
+    DOMAIN as HOMEASSISTANT_DOMAIN,
+    Event,
+    EventStateChangedData,
+    HomeAssistant,
+    State,
+)
+from homeassistant.exceptions import ConditionError
+from homeassistant.helpers import condition
 from homeassistant.helpers.restore_state import RestoreEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -63,7 +74,7 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         self.min_cycle_duration = min_cycle_duration
         self._hvac_mode = HVACMode.OFF
         self._temp_precision = precision
-        self._temp_target_temperature_step = target_temperature_step
+        self._target_temp_step = target_temperature_step
         self._cur_temp: float | None = None
         self._temp_lock = asyncio.Lock()
         self._min_temp = min_temp
@@ -102,8 +113,8 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
     @property
     def target_temperature_step(self) -> float:
         """Return the supported step of target temperature."""
-        if self._temp_target_temperature_step is not None:
-            return self._temp_target_temperature_step
+        if self._target_temp_step is not None:
+            return self._target_temp_step
 
         return self.precision
 
@@ -179,7 +190,10 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             return
 
         self._hvac_mode = hvac_mode
-        await self._async_control(force=True)
+        if self._hvac_mode == HVACMode.OFF and self._is_device_active:
+            await self._async_heater_turn_off()
+        else:
+            await self._async_control(force=True)
         self.async_write_ha_state()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
@@ -200,6 +214,16 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         await self._async_control(force=True)
         self.async_write_ha_state()
 
+    async def _async_sensor_changed(self, event: Event[EventStateChangedData]) -> None:
+        """Handle temperature changes."""
+        new_state = event.data["new_state"]
+        if new_state is None or new_state.state in (STATE_UNAVAILABLE, STATE_UNKNOWN):
+            return
+
+        self._async_update_temp(new_state)
+        await self._async_control_heating()
+        self.async_write_ha_state()
+
     def _async_update_temp(self, state: State) -> None:
         """Update thermostat with latest state from sensor."""
         try:
@@ -212,11 +236,84 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         except ValueError as ex:
             _LOGGER.error("%s: unable to update from sensor: %s", self.entity_id, ex)
 
-    async def _async_control(
-        self, time: datetime | None = None, force: bool = False
-    ) -> None:
+    async def _async_heater_turn_on(self) -> None:
+        """Turn heater toggleable device on."""
+        _LOGGER.debug(
+            "%s: turning ON target device %s", self.entity_id, self.heater_entity_id
+        )
+
+        service = SERVICE_TURN_ON if not self._inverted else SERVICE_TURN_OFF
+        service_data = {ATTR_ENTITY_ID: self.heater_entity_id}
+
+        await self.hass.services.async_call(
+            HOMEASSISTANT_DOMAIN, service, service_data, context=self._context
+        )
+
+    async def _async_heater_turn_off(self) -> None:
+        """Turn heater toggleable device off."""
+        _LOGGER.debug(
+            "%s: turning OFF target device %s", self.entity_id, self.heater_entity_id
+        )
+
+        service = SERVICE_TURN_OFF if not self._inverted else SERVICE_TURN_ON
+        service_data = {ATTR_ENTITY_ID: self.heater_entity_id}
+
+        await self.hass.services.async_call(
+            HOMEASSISTANT_DOMAIN, service, service_data, context=self._context
+        )
+
+    async def _async_control(self, force: bool = False) -> None:
         """Check if we need to turn target device on or off."""
-        pass
+        if self._hvac_mode == HVACMode.OFF:
+            return
+
+        async with self._temp_lock:
+            if not force and self.min_cycle_duration:
+                if self._is_device_active:
+                    current_state = STATE_ON
+                else:
+                    current_state = HVACMode.OFF
+
+                try:
+                    long_enough = condition.state(
+                        self.hass,
+                        self.heater_entity_id,
+                        current_state,
+                        self.min_cycle_duration,
+                    )
+                except ConditionError:
+                    long_enough = False
+
+                if not long_enough:
+                    return
+
+            assert None not in (
+                self._cur_temp,
+                self._target_temp_low,
+                self._target_temp_high,
+            )
+
+            too_cold = self._cur_temp <= self._target_temp_low
+            too_hot = self._cur_temp >= self._target_temp_high
+
+            need_turn_on = (
+                too_hot
+                and self._hvac_mode == HVACMode.COOL
+                or too_cold
+                and self._hvac_mode == HVACMode.HEAT
+            )
+
+            need_turn_off = (
+                too_cold
+                and self._hvac_mode == HVACMode.COOL
+                or too_hot
+                and self._hvac_mode == HVACMode.HEAT
+            )
+
+            if self._is_device_active and need_turn_off:
+                await self._async_heater_turn_off()
+            elif not self._is_device_active and need_turn_on:
+                await self._async_heater_turn_on()
 
     def _round_to_target_precision(self, value: float) -> float:
         step = self.target_temperature_step
