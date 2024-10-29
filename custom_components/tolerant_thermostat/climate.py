@@ -7,6 +7,7 @@ from homeassistant.components.climate import (
     PRESET_NONE,
     ClimateEntity,
     ClimateEntityFeature,
+    HVACAction,
     HVACMode,
 )
 from homeassistant.const import UnitOfTemperature
@@ -46,6 +47,7 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         self._inverted = inverted
         self.min_cycle_duration = min_cycle_duration
         self._hvac_mode = HVACMode.OFF
+        self._running = False
         self._temp_precision = precision
         self._temp_target_temperature_step = target_temperature_step
         self._cur_temp: float | None = None
@@ -74,3 +76,40 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         else:
             self._attr_preset_modes = [PRESET_NONE]
         self._presets = presets
+
+    @property
+    def precision(self) -> float:
+        """Return the precision of the system."""
+        if self._temp_precision is not None:
+            return self._temp_precision
+
+        return super().precision
+
+    @property
+    def target_temperature_step(self) -> float:
+        """Return the supported step of target temperature."""
+        if self._temp_target_temperature_step is not None:
+            return self._temp_target_temperature_step
+
+        return self.precision
+
+    @property
+    def current_temperature(self) -> float | None:
+        """Return the sensor temperature."""
+        return self._cur_temp
+
+    @property
+    def hvac_mode(self) -> HVACMode | None:
+        """Return current operation."""
+        return self._hvac_mode
+
+    @property
+    def hvac_action(self) -> HVACAction:
+        """Return the current running hvac operation if supported."""
+        if self._hvac_mode == HVACMode.OFF:
+            return HVACAction.OFF
+
+        if not self._running:
+            return HVACAction.IDLE
+
+        return HVACAction.COOLING if self._inverted else HVACAction.HEATING
