@@ -10,7 +10,7 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.const import UnitOfTemperature
+from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -25,12 +25,13 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         self,
         hass: HomeAssistant,
         name: str,
-        target_entity_id: str,
+        heater_entity_id: str,
         sensor_entity_id: str,
         min_temp: float | None,
         max_temp: float | None,
         target_temp_high: float | None,
         target_temp_low: float | None,
+        ac_mode: bool | None,
         inverted: bool | None,
         min_cycle_duration: timedelta | None,
         presets: dict[str, float],
@@ -42,12 +43,12 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         """Initialize the thermostat."""
         self._attr_name = name
         self._attr_unique_id = unique_id
-        self.target_entity_id = target_entity_id
+        self.heater_entity_id = heater_entity_id
         self.sensor_entity_id = sensor_entity_id
+        self._ac_mode = ac_mode
         self._inverted = inverted
         self.min_cycle_duration = min_cycle_duration
         self._hvac_mode = HVACMode.OFF
-        self._running = False
         self._temp_precision = precision
         self._temp_target_temperature_step = target_temperature_step
         self._cur_temp: float | None = None
@@ -94,6 +95,22 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         return self.precision
 
     @property
+    def min_temp(self) -> float:
+        """Return the minimum temperature."""
+        if self._min_temp is not None:
+            return self._min_temp
+
+        return super().min_temp
+
+    @property
+    def max_temp(self) -> float:
+        """Return the maximum temperature."""
+        if self._max_temp is not None:
+            return self._max_temp
+
+        return super().max_temp
+
+    @property
     def current_temperature(self) -> float | None:
         """Return the sensor temperature."""
         return self._cur_temp
@@ -109,7 +126,27 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         if self._hvac_mode == HVACMode.OFF:
             return HVACAction.OFF
 
-        if not self._running:
+        if not self._is_device_active:
             return HVACAction.IDLE
 
-        return HVACAction.COOLING if self._inverted else HVACAction.HEATING
+        return HVACAction.COOLING if self._ac_mode else HVACAction.HEATING
+
+    @property
+    def target_temperature_low(self) -> float | None:
+        """Return the lower bound temperature."""
+        return self._target_temp_low
+
+    @property
+    def target_temperature_high(self) -> float | None:
+        """Return the upper bound temperature."""
+        return self._target_temp_high
+
+    @property
+    def _is_device_active(self) -> bool | None:
+        """If the toggleable device is currently active."""
+        if not self.hass.states.get(self.heater_entity_id):
+            return None
+
+        return self.hass.states.is_state(
+            self.heater_entity_id, STATE_ON if not self._inverted else STATE_OFF
+        )
