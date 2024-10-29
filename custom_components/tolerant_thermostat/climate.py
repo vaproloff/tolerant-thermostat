@@ -1,7 +1,8 @@
 """Adds support for Tolerant Thermostat units."""
 
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta
+import logging
 
 from homeassistant.components.climate import (
     PRESET_NONE,
@@ -13,6 +14,8 @@ from homeassistant.components.climate import (
 from homeassistant.const import STATE_OFF, STATE_ON, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.restore_state import RestoreEntity
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class TolerantThermostat(ClimateEntity, RestoreEntity):
@@ -150,3 +153,27 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         return self.hass.states.is_state(
             self.heater_entity_id, STATE_ON if not self._inverted else STATE_OFF
         )
+
+    async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
+        """Set hvac mode."""
+        if hvac_mode not in self._attr_hvac_modes:
+            _LOGGER.error("%s: unsupported hvac mode: %s", self.entity_id, hvac_mode)
+            return
+
+        if hvac_mode == self._hvac_mode:
+            _LOGGER.info(
+                "%s: no need to control. HVAC mode %s already set",
+                self.entity_id,
+                hvac_mode,
+            )
+            return
+
+        self._hvac_mode = hvac_mode
+        await self._async_control(force=True)
+        self.async_write_ha_state()
+
+    async def _async_control(
+        self, time: datetime | None = None, force: bool = False
+    ) -> None:
+        """Check if we need to turn target device on or off."""
+        pass
