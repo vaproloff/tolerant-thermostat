@@ -224,6 +224,28 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         await self._async_control_heating()
         self.async_write_ha_state()
 
+    def _async_switch_changed(self, event: Event[EventStateChangedData]) -> None:
+        """Handle heater switch state changes."""
+        new_state = event.data["new_state"]
+        old_state = event.data["old_state"]
+        if new_state is None:
+            return
+        if old_state is None:
+            self.hass.async_create_task(
+                self._check_switch_initial_state(), eager_start=True
+            )
+        self.async_write_ha_state()
+
+    async def _check_switch_initial_state(self) -> None:
+        """Prevent the device from keep running if HVACMode.OFF."""
+        if self._hvac_mode == HVACMode.OFF and self._is_device_active:
+            _LOGGER.warning(
+                "%s: hvac mode is OFF, but the target device is ON. Turning off device %s",
+                self.entity_id,
+                self.heater_entity_id,
+            )
+            await self._async_heater_turn_off()
+
     def _async_update_temp(self, state: State) -> None:
         """Update thermostat with latest state from sensor."""
         try:
