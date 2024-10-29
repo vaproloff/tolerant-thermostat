@@ -7,10 +7,8 @@ import math
 from typing import Any
 
 from homeassistant.components.climate import (
-    ATTR_PRESET_MODE,
     ATTR_TARGET_TEMP_HIGH,
     ATTR_TARGET_TEMP_LOW,
-    PRESET_NONE,
     ClimateEntity,
     ClimateEntityFeature,
     HVACAction,
@@ -62,7 +60,6 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         ac_mode: bool | None,
         inverted: bool | None,
         min_cycle_duration: timedelta | None,
-        presets: dict[str, float],
         precision: float | None,
         target_temperature_step: float | None,
         unit: UnitOfTemperature,
@@ -97,14 +94,6 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             | ClimateEntityFeature.TURN_OFF
             | ClimateEntityFeature.TURN_ON
         )
-
-        self._attr_preset_mode = PRESET_NONE
-        if len(presets):
-            self._attr_supported_features |= ClimateEntityFeature.PRESET_MODE
-            self._attr_preset_modes = [PRESET_NONE, *presets.keys()]
-        else:
-            self._attr_preset_modes = [PRESET_NONE]
-        self._presets = presets
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -168,12 +157,6 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
                         self.max_temp,
                     )
                     self._target_temp_high = self.max_temp
-
-            if (
-                self.preset_modes
-                and old_state.attributes.get(ATTR_PRESET_MODE) in self.preset_modes
-            ):
-                self._attr_preset_mode = old_state.attributes.get(ATTR_PRESET_MODE)
 
             if not self._hvac_mode and old_state.state:
                 self._hvac_mode = HVACMode(old_state.state)
@@ -385,6 +368,13 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             HOMEASSISTANT_DOMAIN, service, service_data, context=self._context
         )
 
+    def _round_to_target_precision(self, value: float) -> float:
+        step = self.target_temperature_step
+        if step and value is not None:
+            return round(value / step) * step
+
+        return value
+
     async def _async_control(self, force: bool = False) -> None:
         """Check if we need to turn target device on or off."""
         if self._hvac_mode == HVACMode.OFF:
@@ -437,10 +427,3 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
                 await self._async_heater_turn_off()
             elif not self._is_device_active and need_turn_on:
                 await self._async_heater_turn_on()
-
-    def _round_to_target_precision(self, value: float) -> float:
-        step = self.target_temperature_step
-        if step and value is not None:
-            return round(value / step) * step
-
-        return value
