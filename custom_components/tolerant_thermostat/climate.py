@@ -7,6 +7,7 @@ import math
 from typing import Any
 
 from homeassistant.components.climate import (
+    ATTR_PRESET_MODE,
     ATTR_TARGET_TEMP_HIGH,
     ATTR_TARGET_TEMP_LOW,
     PRESET_NONE,
@@ -17,6 +18,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    EVENT_HOMEASSISTANT_START,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     STATE_OFF,
@@ -27,6 +29,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import (
     DOMAIN as HOMEASSISTANT_DOMAIN,
+    CoreState,
     Event,
     EventStateChangedData,
     HomeAssistant,
@@ -34,9 +37,7 @@ from homeassistant.core import (
 )
 from homeassistant.exceptions import ConditionError
 from homeassistant.helpers import condition
-from homeassistant.helpers.event import (
-    async_track_state_change_event,
-)
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -119,6 +120,88 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
                 self.hass, [self.heater_entity_id], self._async_switch_changed
             )
         )
+
+        def _async_startup(_: Event | None = None) -> None:
+            """Init on startup."""
+            sensor_state = self.hass.states.get(self.sensor_entity_id)
+            if sensor_state and sensor_state.state not in (
+                STATE_UNAVAILABLE,
+                STATE_UNKNOWN,
+            ):
+                self._async_update_temp(sensor_state)
+                self.async_write_ha_state()
+            switch_state = self.hass.states.get(self.heater_entity_id)
+            if switch_state and switch_state.state not in (
+                STATE_UNAVAILABLE,
+                STATE_UNKNOWN,
+            ):
+                self.hass.async_create_task(
+                    self._check_switch_initial_state(), eager_start=True
+                )
+
+        if self.hass.state is CoreState.running:
+            _async_startup()
+        else:
+            self.hass.bus.async_listen_once(EVENT_HOMEASSISTANT_START, _async_startup)
+
+        if (old_state := await self.async_get_last_state()) is not None:
+            if self._target_temp_low is None:
+                old_target_low = old_state.attributes.get(ATTR_TARGET_TEMP_LOW)
+                if old_target_low is not None:
+                    self._target_temp_low = float(old_target_low)
+                else:
+                    _LOGGER.debug(
+                        "%s: no target temperature low found in old state, falling back to default min_temp: %s",
+                        self.entity_id,
+                        self.min_temp,
+                    )
+                    self._target_temp_low = self.min_temp
+
+            if self._target_temp_high is None:
+                old_target_high = old_state.attributes.get(ATTR_TARGET_TEMP_HIGH)
+                if old_target_high is not None:
+                    self._target_temp_high = float(old_target_high)
+                else:
+                    _LOGGER.debug(
+                        "%s: no target temperature high found in old state, falling back to default max_temp: %s",
+                        self.entity_id,
+                        self.max_temp,
+                    )
+                    self._target_temp_high = self.max_temp
+
+            if (
+                self.preset_modes
+                and old_state.attributes.get(ATTR_PRESET_MODE) in self.preset_modes
+            ):
+                self._attr_preset_mode = old_state.attributes.get(ATTR_PRESET_MODE)
+
+            if not self._hvac_mode and old_state.state:
+                self._hvac_mode = HVACMode(old_state.state)
+
+        else:
+            if self._target_temp_low is None:
+                _LOGGER.warning(
+                    "%s: no previously saved target low temperature, setting default: %s",
+                    self.entity_id,
+                    self.min_temp,
+                )
+                self._target_temp_low = self.min_temp
+
+            if self._target_temp_high is None:
+                _LOGGER.warning(
+                    "%s: no previously saved target high temperature, setting default: %s",
+                    self.entity_id,
+                    self.max_temp,
+                )
+                self._target_temp_high = self.max_temp
+
+        if not self._hvac_mode:
+            _LOGGER.warning(
+                "%s: no previously saved HVAC mode, setting default: %s",
+                self.entity_id,
+                HVACMode.OFF,
+            )
+            self._hvac_mode = HVACMode.OFF
 
     @property
     def precision(self) -> float:
