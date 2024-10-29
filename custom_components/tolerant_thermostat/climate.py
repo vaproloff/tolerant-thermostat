@@ -3,8 +3,11 @@
 import asyncio
 from datetime import datetime, timedelta
 import logging
+from typing import Any
 
 from homeassistant.components.climate import (
+    ATTR_TARGET_TEMP_HIGH,
+    ATTR_TARGET_TEMP_LOW,
     PRESET_NONE,
     ClimateEntity,
     ClimateEntityFeature,
@@ -172,8 +175,33 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
         await self._async_control(force=True)
         self.async_write_ha_state()
 
+    async def async_set_temperature(self, **kwargs: Any) -> None:
+        """Set new target temperature."""
+        temp_low = kwargs.get(ATTR_TARGET_TEMP_LOW)
+        temp_high = kwargs.get(ATTR_TARGET_TEMP_HIGH)
+
+        if temp_low is None and temp_high is None:
+            _LOGGER.warning("%s: undefined target temperatures", self.entity_id)
+            return
+
+        if temp_low is not None:
+            self._target_temp_low = self._round_to_target_precision(temp_low)
+
+        if temp_high is not None:
+            self._target_temp_high = self._round_to_target_precision(temp_high)
+
+        await self._async_control(force=True)
+        self.async_write_ha_state()
+
     async def _async_control(
         self, time: datetime | None = None, force: bool = False
     ) -> None:
         """Check if we need to turn target device on or off."""
         pass
+
+    def _round_to_target_precision(self, value: float) -> float:
+        step = self.target_temperature_step
+        if step and value is not None:
+            return round(value / step) * step
+
+        return value
