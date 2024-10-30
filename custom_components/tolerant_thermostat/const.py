@@ -2,7 +2,7 @@
 
 from homeassistant.const import Platform
 
-DOMAIN = "generic_thermostat"
+DOMAIN = "tolerant_thermostat"
 
 PLATFORMS = [Platform.CLIMATE]
 
