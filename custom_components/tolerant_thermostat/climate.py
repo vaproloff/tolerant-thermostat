@@ -1,22 +1,31 @@
 """Adds support for Tolerant Thermostat units."""
 
 import asyncio
+from collections.abc import Mapping
 from datetime import timedelta
 import logging
 import math
 from typing import Any
 
+import voluptuous as vol
+
 from homeassistant.components.climate import (
     ATTR_TARGET_TEMP_HIGH,
     ATTR_TARGET_TEMP_LOW,
+    PLATFORM_SCHEMA as CLIMATE_PLATFORM_SCHEMA,
     ClimateEntity,
     ClimateEntityFeature,
     HVACAction,
     HVACMode,
 )
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
+    CONF_NAME,
     EVENT_HOMEASSISTANT_START,
+    PRECISION_HALVES,
+    PRECISION_TENTHS,
+    PRECISION_WHOLE,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     STATE_OFF,
@@ -34,11 +43,110 @@ from homeassistant.core import (
     State,
 )
 from homeassistant.exceptions import ConditionError
-from homeassistant.helpers import condition
+from homeassistant.helpers import condition, config_validation as cv
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
 
+from .const import (
+    CONF_AC_MODE,
+    CONF_HEATER,
+    CONF_INVERTED,
+    CONF_MAX_TEMP,
+    CONF_MIN_DUR,
+    CONF_MIN_TEMP,
+    CONF_PRECISION,
+    CONF_SENSOR,
+    CONF_TARGET_TEMP_HIGH,
+    CONF_TARGET_TEMP_LOW,
+    CONF_TEMP_STEP,
+    DEFAULT_NAME,
+)
+
 _LOGGER = logging.getLogger(__name__)
+
+PLATFORM_SCHEMA_COMMON = vol.Schema(
+    {
+        vol.Optional(CONF_NAME, default=DEFAULT_NAME): cv.string,
+        vol.Required(CONF_HEATER): cv.entity_id,
+        vol.Required(CONF_SENSOR): cv.entity_id,
+        vol.Optional(CONF_MIN_TEMP): vol.Coerce(float),
+        vol.Optional(CONF_MAX_TEMP): vol.Coerce(float),
+        vol.Optional(CONF_TARGET_TEMP_HIGH): vol.Coerce(float),
+        vol.Optional(CONF_TARGET_TEMP_LOW): vol.Coerce(float),
+        vol.Optional(CONF_AC_MODE): cv.boolean,
+        vol.Optional(CONF_INVERTED): cv.boolean,
+        vol.Optional(CONF_MIN_DUR): cv.positive_time_period,
+        vol.Optional(CONF_PRECISION): vol.All(
+            vol.Coerce(float),
+            vol.In([PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE]),
+        ),
+        vol.Optional(CONF_TEMP_STEP): vol.All(
+            vol.In([PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
+        ),
+    }
+)
+
+PLATFORM_SCHEMA = CLIMATE_PLATFORM_SCHEMA.extend(PLATFORM_SCHEMA_COMMON.schema)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Initialize config entry."""
+    await _async_setup_config(
+        hass,
+        PLATFORM_SCHEMA_COMMON(dict(config_entry.options)),
+        config_entry.entry_id,
+        async_add_entities,
+    )
+
+
+async def _async_setup_config(
+    hass: HomeAssistant,
+    config: Mapping[str, Any],
+    unique_id: str | None,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    """Set up the generic thermostat platform."""
+
+    name: str = config[CONF_NAME]
+    heater_entity_id: str = config[CONF_HEATER]
+    sensor_entity_id: str = config[CONF_SENSOR]
+    min_temp: float | None = config.get(CONF_MIN_TEMP)
+    max_temp: float | None = config.get(CONF_MAX_TEMP)
+    target_temp_high: float | None = config.get(CONF_TARGET_TEMP_HIGH)
+    target_temp_low: float | None = config.get(CONF_TARGET_TEMP_LOW)
+    ac_mode: bool | None = config.get(CONF_AC_MODE)
+    inverted: bool | None = config.get(CONF_INVERTED)
+    min_cycle_duration: timedelta | None = config.get(CONF_MIN_DUR)
+    precision: float | None = config.get(CONF_PRECISION)
+    target_temperature_step: float | None = config.get(CONF_TEMP_STEP)
+    unit = hass.config.units.temperature_unit
+
+    async_add_entities(
+        [
+            TolerantThermostat(
+                hass,
+                name,
+                heater_entity_id,
+                sensor_entity_id,
+                min_temp,
+                max_temp,
+                target_temp_high,
+                target_temp_low,
+                ac_mode,
+                inverted,
+                min_cycle_duration,
+                precision,
+                target_temperature_step,
+                unit,
+                unique_id,
+            )
+        ]
+    )
 
 
 class TolerantThermostat(ClimateEntity, RestoreEntity):
