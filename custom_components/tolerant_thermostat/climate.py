@@ -41,6 +41,7 @@ from homeassistant.core import (
     EventStateChangedData,
     HomeAssistant,
     State,
+    callback,
 )
 from homeassistant.exceptions import ConditionError
 from homeassistant.helpers import condition, config_validation as cv
@@ -218,6 +219,7 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             )
         )
 
+        @callback
         def _async_startup(_: Event | None = None) -> None:
             """Init on startup."""
             sensor_state = self.hass.states.get(self.sensor_entity_id)
@@ -266,7 +268,7 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
                     )
                     self._target_temp_high = self.max_temp
 
-            if not self._hvac_mode and old_state.state:
+            if old_state.state in self._attr_hvac_modes:
                 self._hvac_mode = HVACMode(old_state.state)
 
         else:
@@ -413,9 +415,10 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             return
 
         self._async_update_temp(new_state)
-        await self._async_control_heating()
+        await self._async_control()
         self.async_write_ha_state()
 
+    @callback
     def _async_switch_changed(self, event: Event[EventStateChangedData]) -> None:
         """Handle heater switch state changes."""
         new_state = event.data["new_state"]
@@ -438,6 +441,7 @@ class TolerantThermostat(ClimateEntity, RestoreEntity):
             )
             await self._async_heater_turn_off()
 
+    @callback
     def _async_update_temp(self, state: State) -> None:
         """Update thermostat with latest state from sensor."""
         try:
