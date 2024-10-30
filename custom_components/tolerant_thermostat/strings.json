@@ -1,0 +1,70 @@
+{
+  "title": "Tolerant thermostat",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add tolerant thermostat",
+        "description": "Create a climate entity that controls the temperature via a switch and sensor.",
+        "data": {
+          "name": "[%key:common::config_flow::data::name%]",
+          "target_sensor": "Temperature sensor",
+          "heater": "Actuator switch",
+          "ac_mode": "Cooling mode",
+          "inverted": "Inverted mode",
+          "min_temp": "Minimum temperature",
+          "max_temp": "Maximum temperature",
+          "target_temp_high": "Upper target temperature",
+          "target_temp_low": "Lower target temperature",
+          "precision": "Temperature precision",
+          "target_temp_step": "Target temperature step",
+          "min_cycle_duration": "Minimum cycle duration"
+        },
+        "data_description": {
+          "target_sensor": "Temperature sensor that reflect the current temperature.",
+          "heater": "Switch entity used to cool or heat depending on A/C mode.",
+          "ac_mode": "Set the actuator specified to be treated as a cooling device instead of a heating device.",
+          "inverted": "Set the actuator toggling behaviour mode.",
+          "min_temp": "Target temperature minimum limit.",
+          "max_temp": "Target temperature maximum limit.",
+          "target_temp_high": "Initial upper target temperature setpoint.",
+          "target_temp_low": "Initial lower target temperature setpoint.",
+          "precision": "Temperature precision for a sensor",
+          "target_temp_step": "Target temperature step",
+          "min_cycle_duration": "Set a minimum amount of time that the switch specified must be in its current state prior to being switched either off or on. This option will be ignored if the keep alive option is set."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "data": {
+          "target_sensor": "[%key:component::tolerant_thermostat::config::step::user::data::target_sensor%]",
+          "heater": "[%key:component::tolerant_thermostat::config::step::user::data::heater%]",
+          "ac_mode": "[%key:component::tolerant_thermostat::config::step::user::data::ac_mode%]",
+          "inverted": "[%key:component::tolerant_thermostat::config::step::user::data::inverted%]",
+          "min_temp": "[%key:component::tolerant_thermostat::config::step::user::data::min_temp%]",
+          "max_temp": "[%key:component::tolerant_thermostat::config::step::user::data::max_temp%]",
+          "target_temp_high": "[%key:component::tolerant_thermostat::config::step::user::data::target_temp_high%]",
+          "target_temp_low": "[%key:component::tolerant_thermostat::config::step::user::data::target_temp_low%]",
+          "precision": "[%key:component::tolerant_thermostat::config::step::user::data::precision%]",
+          "target_temp_step": "[%key:component::tolerant_thermostat::config::step::user::data::target_temp_step%]",
+          "min_cycle_duration": "[%key:component::tolerant_thermostat::config::step::user::data::min_cycle_duration%]"
+        },
+        "data_description": {
+          "heater": "[%key:component::tolerant_thermostat::config::step::user::data_description::heater%]",
+          "target_sensor": "[%key:component::tolerant_thermostat::config::step::user::data_description::target_sensor%]",
+          "ac_mode": "[%key:component::tolerant_thermostat::config::step::user::data_description::ac_mode%]",
+          "inverted": "[%key:component::tolerant_thermostat::config::step::user::data_description::inverted%]",
+          "min_temp": "[%key:component::tolerant_thermostat::config::step::user::data_description::min_temp%]",
+          "max_temp": "[%key:component::tolerant_thermostat::config::step::user::data_description::max_temp%]",
+          "target_temp_high": "[%key:component::tolerant_thermostat::config::step::user::data_description::target_temp_high%]",
+          "target_temp_low": "[%key:component::tolerant_thermostat::config::step::user::data_description::target_temp_low%]",
+          "precision": "[%key:component::tolerant_thermostat::config::step::user::data_description::precision%]",
+          "target_temp_step": "[%key:component::tolerant_thermostat::config::step::user::data_description::target_temp_step%]",
+          "min_cycle_duration": "[%key:component::tolerant_thermostat::config::step::user::data_description::min_cycle_duration%]"
+        }
+      }
+    }
+  }
+}
