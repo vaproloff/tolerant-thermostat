@@ -78,12 +78,11 @@ PLATFORM_SCHEMA_COMMON = vol.Schema(
         vol.Optional(CONF_AC_MODE): cv.boolean,
         vol.Optional(CONF_INVERTED): cv.boolean,
         vol.Optional(CONF_MIN_DUR): cv.positive_time_period,
-        vol.Optional(CONF_PRECISION): vol.All(
-            vol.Coerce(float),
-            vol.In([PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE]),
+        vol.Optional(CONF_PRECISION): vol.In(
+            map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
         ),
-        vol.Optional(CONF_TEMP_STEP): vol.All(
-            vol.In([PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
+        vol.Optional(CONF_TEMP_STEP): vol.In(
+            map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
         ),
     }
 )
@@ -123,8 +122,12 @@ async def _async_setup_config(
     ac_mode: bool | None = config.get(CONF_AC_MODE)
     inverted: bool | None = config.get(CONF_INVERTED)
     min_cycle_duration: timedelta | None = config.get(CONF_MIN_DUR)
-    precision: float | None = config.get(CONF_PRECISION)
-    target_temperature_step: float | None = config.get(CONF_TEMP_STEP)
+    precision: float | None = (
+        float(config.get(CONF_PRECISION)) if config.get(CONF_PRECISION) else None
+    )
+    target_temperature_step: float | None = (
+        float(config.get(CONF_TEMP_STEP)) if config.get(CONF_TEMP_STEP) else None
+    )
     unit = hass.config.units.temperature_unit
 
     async_add_entities(

@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import voluptuous as vol
 
-from homeassistant.components import fan, switch
+from homeassistant.components import fan, input_boolean, switch
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN, SensorDeviceClass
 from homeassistant.const import (
     CONF_NAME,
@@ -44,7 +44,9 @@ OPTIONS_SCHEMA = {
         )
     ),
     vol.Required(CONF_HEATER): selector.EntitySelector(
-        selector.EntitySelectorConfig(domain=[fan.DOMAIN, switch.DOMAIN])
+        selector.EntitySelectorConfig(
+            domain=[fan.DOMAIN, switch.DOMAIN, input_boolean.DOMAIN]
+        )
     ),
     vol.Required(CONF_AC_MODE): selector.BooleanSelector(
         selector.BooleanSelectorConfig(),
@@ -74,13 +76,19 @@ OPTIONS_SCHEMA = {
     ),
     vol.Optional(CONF_PRECISION): selector.SelectSelector(
         selector.SelectSelectorConfig(
-            options=[PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE],
+            options=list(
+                map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
+            ),
+            multiple=False,
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
     ),
     vol.Optional(CONF_TEMP_STEP): selector.SelectSelector(
         selector.SelectSelectorConfig(
-            options=[PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE],
+            options=list(
+                map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
+            ),
+            multiple=False,
             mode=selector.SelectSelectorMode.DROPDOWN,
         )
     ),
