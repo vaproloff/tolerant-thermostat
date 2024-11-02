@@ -9,13 +9,7 @@ import voluptuous as vol
 
 from homeassistant.components import fan, input_boolean, switch
 from homeassistant.components.sensor import DOMAIN as SENSOR_DOMAIN, SensorDeviceClass
-from homeassistant.const import (
-    CONF_NAME,
-    DEGREE,
-    PRECISION_HALVES,
-    PRECISION_TENTHS,
-    PRECISION_WHOLE,
-)
+from homeassistant.const import CONF_NAME, DEGREE
 from homeassistant.helpers import selector
 from homeassistant.helpers.schema_config_entry_flow import (
     SchemaConfigFlowHandler,
@@ -74,23 +68,11 @@ OPTIONS_SCHEMA = {
             mode=selector.NumberSelectorMode.BOX, unit_of_measurement=DEGREE, step=0.5
         )
     ),
-    vol.Optional(CONF_PRECISION): selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=list(
-                map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
-            ),
-            multiple=False,
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        )
+    vol.Optional(CONF_PRECISION): selector.NumberSelector(
+        selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, step=0.1)
     ),
-    vol.Optional(CONF_TEMP_STEP): selector.SelectSelector(
-        selector.SelectSelectorConfig(
-            options=list(
-                map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
-            ),
-            multiple=False,
-            mode=selector.SelectSelectorMode.DROPDOWN,
-        )
+    vol.Optional(CONF_TEMP_STEP): selector.NumberSelector(
+        selector.NumberSelectorConfig(mode=selector.NumberSelectorMode.BOX, step=0.1)
     ),
     vol.Optional(CONF_MIN_DUR): selector.DurationSelector(
         selector.DurationSelectorConfig(

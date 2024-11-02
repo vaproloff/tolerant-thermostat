@@ -1,6 +1,6 @@
 {
   "domain": "tolerant_thermostat",
-  "name": "Tolerant Thermostat",
+  "name": "Tolerant Thermostat with dual temperature setpoints and no tolerances",
   "codeowners": [
     "@vaproloff"
   ],
