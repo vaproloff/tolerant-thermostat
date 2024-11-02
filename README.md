@@ -38,5 +38,37 @@ NOTE: This is not recommended way, because you will need to upgrade component ma
 2. Restart Home Assistant Core.
 
 
-## Setup
+## Setup via config entry
 > Configuration > Integrations > ADD INTEGRATION > **Tolerant Thermostat**
+
+
+## Manual setup
+- add yaml config to your configuration file or package
+- reload Home Assistant
+
+#### Simple config example
+```yaml
+climate:
+  - platform: tolerant_thermostat    
+    target_sensor: sensor.my_temperature_sensor
+    heater: switch.my_super_heater
+```
+
+#### Full config example
+```yaml
+climate:
+  - platform: tolerant_thermostat    
+    name: My new tolerant thermostat
+    target_sensor: sensor.my_temperature_sensor
+    heater: switch.my_inverted_heater
+    ac_mode: false
+    inverted: true
+    min_temp: 16
+    max_temp: 30
+    target_temp_low: 24.5
+    target_temp_high: 25.5
+    min_cycle_duration:
+      minutes: 5
+    precision: 0.1    
+    target_temp_step: 0.5
+```
