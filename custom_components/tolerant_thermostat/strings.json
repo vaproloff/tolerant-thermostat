@@ -66,5 +66,11 @@
         }
       }
     }
+  },
+  "services": {
+    "reload": {
+      "name": "[%key:common::action::reload%]",
+      "description": "Reloads tolerant thermostats from the YAML-configuration."
+    }
   }
 }

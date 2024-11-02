@@ -22,6 +22,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     CONF_NAME,
+    CONF_UNIQUE_ID,
     EVENT_HOMEASSISTANT_START,
     PRECISION_HALVES,
     PRECISION_TENTHS,
@@ -47,7 +48,9 @@ from homeassistant.exceptions import ConditionError
 from homeassistant.helpers import condition, config_validation as cv
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.reload import async_setup_reload_service
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import (
     CONF_AC_MODE,
@@ -62,6 +65,8 @@ from .const import (
     CONF_TARGET_TEMP_LOW,
     CONF_TEMP_STEP,
     DEFAULT_NAME,
+    DOMAIN,
+    PLATFORMS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,8 +80,8 @@ PLATFORM_SCHEMA_COMMON = vol.Schema(
         vol.Optional(CONF_MAX_TEMP): vol.Coerce(float),
         vol.Optional(CONF_TARGET_TEMP_HIGH): vol.Coerce(float),
         vol.Optional(CONF_TARGET_TEMP_LOW): vol.Coerce(float),
-        vol.Optional(CONF_AC_MODE): cv.boolean,
-        vol.Optional(CONF_INVERTED): cv.boolean,
+        vol.Optional(CONF_AC_MODE, default=False): cv.boolean,
+        vol.Optional(CONF_INVERTED, default=False): cv.boolean,
         vol.Optional(CONF_MIN_DUR): cv.positive_time_period,
         vol.Optional(CONF_PRECISION): vol.In(
             map(str, [PRECISION_TENTHS, PRECISION_HALVES, PRECISION_WHOLE])
@@ -101,6 +106,20 @@ async def async_setup_entry(
         PLATFORM_SCHEMA_COMMON(dict(config_entry.options)),
         config_entry.entry_id,
         async_add_entities,
+    )
+
+
+async def async_setup_platform(
+    hass: HomeAssistant,
+    config: ConfigType,
+    async_add_entities: AddEntitiesCallback,
+    discovery_info: DiscoveryInfoType | None = None,
+) -> None:
+    """Set up the generic thermostat platform."""
+
+    await async_setup_reload_service(hass, DOMAIN, PLATFORMS)
+    await _async_setup_config(
+        hass, config, config.get(CONF_UNIQUE_ID), async_add_entities
     )
 
 
